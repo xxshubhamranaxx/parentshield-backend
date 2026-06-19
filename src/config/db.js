@@ -2,15 +2,19 @@ const { Pool } = require('pg');
 const { logger } = require('./logger');
 
 const pool = new Pool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     parseInt(process.env.DB_PORT) || 5432,
-  database: process.env.DB_NAME     || 'parentshield',
-  user:     process.env.DB_USER     || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT) || 5432,
+  database: process.env.DB_NAME || 'parentshield',
+  user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD,
+
+  ssl: {
+    rejectUnauthorized: false
+  },
+
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-  ssl: false,
+  connectionTimeoutMillis: 10000,
 });
 
 pool.on('error', (err) => {
@@ -25,10 +29,8 @@ async function connectDB() {
 }
 
 async function query(text, params) {
-  const start = Date.now();
   try {
-    const result = await pool.query(text, params);
-    return result;
+    return await pool.query(text, params);
   } catch (err) {
     logger.error(`Query error: ${text}`, err);
     throw err;
@@ -37,9 +39,12 @@ async function query(text, params) {
 
 async function withTransaction(callback) {
   const client = await pool.connect();
+
   try {
     await client.query('BEGIN');
+
     const result = await callback(client);
+
     await client.query('COMMIT');
     return result;
   } catch (err) {
@@ -50,4 +55,9 @@ async function withTransaction(callback) {
   }
 }
 
-module.exports = { pool, query, withTransaction, connectDB };
+module.exports = {
+  pool,
+  query,
+  withTransaction,
+  connectDB,
+};
